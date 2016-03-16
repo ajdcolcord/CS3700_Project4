@@ -1,0 +1,15 @@
+#!/usr/bin/python -u
+import sys
+import urllib2
+
+ADDRESS = "http://fring.ccs.neu.edu/accounts/login/?next=/fakebook/"
+
+
+def main():
+    username = sys.argv[1]
+    password = sys.argv[2]
+
+
+def login(username, password):
+    global ADDRESS
+    urllib2.urlopen(ADDRESS)
