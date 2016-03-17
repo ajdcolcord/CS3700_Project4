@@ -20,7 +20,7 @@ def main():
 
 
 def send_message(socket):
-    socket.send("GET /accounts/login/?next=/fakebook.html HTTP/1.0\n") #+
+    socket.send("GET /accounts/login/?next=/fakebook.html\n") #+
                 #"From: acolcord@ccs.neu.edu\n" +
                 #"User-Agent: HTTPTool/1.0\n")
     print socket.recv(1024)
