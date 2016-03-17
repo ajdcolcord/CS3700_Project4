@@ -19,7 +19,7 @@ def main():
         sys.exit(1)
 
 def send_message(socket):
-    socket.send("GET /path/file.html HTTP/1.0")
+    socket.send("GET /fakebook.html HTTP/1.0")
     print socket.recv(1024)
 
 
