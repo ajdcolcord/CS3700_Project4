@@ -1,6 +1,6 @@
 import socket, sys
 
-HOSTNAME = "fring.ccs.neu.edu/fakebook"
+HOSTNAME = "fring.ccs.neu.edu"
 PORT = 80
 
 def main():
