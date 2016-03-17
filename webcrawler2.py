@@ -10,10 +10,18 @@ def main():
     # connect the socket to the host
     try:
         s.connect((HOSTNAME, PORT))
-        print "success"
+        print "Successfully connected to: " + str(HOSTNAME) + " on port: " + str(PORT)
+
+        send_message(s)
+
     except socket.error:
         print "Failed To Connect Socket to Host"
         sys.exit(1)
+
+def send_message(socket):
+    socket.send("GET /path/file.html HTTP/1.0")
+    print socket.recv()
+
 
 
 if __name__ == "__main__":
