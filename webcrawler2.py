@@ -20,7 +20,7 @@ def main():
 
 def send_message(socket):
     socket.send("GET /path/file.html HTTP/1.0")
-    print socket.recv()
+    print socket.recv(1024)
 
 
 
