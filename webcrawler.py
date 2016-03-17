@@ -1,6 +1,5 @@
 #!/usr/bin/python -u
 import sys
-import urllib
 import urllib2
 from HTMLParser import HTMLParser
 
@@ -31,7 +30,7 @@ class MyHTMLParser(HTMLParser):
                         for attr in attrs:
                             if attr[0] == "value":
                                 MIDDLEWARE_TOKEN = attr[1]
-                                print MIDDLEWARE_TOKEN
+                                #print MIDDLEWARE_TOKEN
 
                     #print attr
 
@@ -79,32 +78,8 @@ def login(username, password):
 
     parser.close()
 
-    genPostReq(username, password, MIDDLEWARE_TOKEN)
 
 
-def genPostReq(username, password, mwtoken):
-    # Using the username, password, and token generate and send
-    # a POST request to the fakebook server.
-    url = 'http://fring.ccs.neu.edu/accounts/login/?next=/fakebook/'
-    values = {'username' : username,
-              'password' : password,
-              'next' : '/fakebook/',
-              'csrfmiddlewaretoken' : mwtoken }
-
-    try:
-        data = urllib.urlencode(values)
-        req = urllib2.Request(url, data)
-        response = urllib2.urlopen(req)
-        the_page = response.read()
-        handle_http_errs(the_page)
-        #print the_page
-    except:
-        print "HTTP Error Code Returned"
-
-
-# Handles the http Response Code and decides the course of action
-def handle_http_errs(http_err):
-    print http_err
 
 if __name__ == "__main__":
     main()
