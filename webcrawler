@@ -1,15 +1,18 @@
 #!/usr/bin/python -u
 import sys
-import urllib
-import urllib2
 from HTMLParser import HTMLParser
-from get import get_login_page
+from get import get_login_page, post_login
 
 ADDRESS = "http://fring.ccs.neu.edu/accounts/login/?next=/fakebook/"
+
+LOGIN_PAGE_PATH = "/accounts/login/?next=/fakebook.html"
+
 
 LOGIN_USERNAME = "id_username"
 LOGIN_PASSWORD = "id_password"
 MIDDLEWARE_TOKEN = None
+USERNAME = "001196344"
+PASSWORD = "7L3AD6ZH"
 
 class MyHTMLParser(HTMLParser):
     def __init__(self):
@@ -18,7 +21,8 @@ class MyHTMLParser(HTMLParser):
         self.data = []
 
     def handle_starttag(self, tag, attrs):
-        global TOKEN
+        global MIDDLEWARE_TOKEN
+
         #print("Start tag:", tag)
         #for attr in attrs:
         #    print("     attr:", attr)
@@ -70,20 +74,28 @@ def main():
 
 def login(username, password):
     global ADDRESS
+    global MIDDLEWARE_TOKEN
 
     #login_html = urllib2.urlopen(ADDRESS).read()
     login_html = get_login_page()
+    print login_html
 
     parser = MyHTMLParser()
 
     # parse login_html for username
     parser.feed(login_html)
 
+    print "USER: " + USERNAME
+    print "PASSWORD " + PASSWORD
+    print "TOKEN " + MIDDLEWARE_TOKEN
+
+    print post_login(LOGIN_PAGE_PATH, USERNAME, PASSWORD, MIDDLEWARE_TOKEN)
+
     parser.close()
 
-    genPostReq(username, password, MIDDLEWARE_TOKEN)
+    #genPostReq(username, password, MIDDLEWARE_TOKEN)
 
-
+'''
 def genPostReq(username, password, mwtoken):
     # Using the username, password, and token generate and send
     # a POST request to the fakebook server.
@@ -103,10 +115,11 @@ def genPostReq(username, password, mwtoken):
     except:
         print "HTTP Error Code Returned"
 
-
+'''
 # Handles the http Response Code and decides the course of action
 def handle_http_errs(http_err):
     print http_err
+
 
 if __name__ == "__main__":
     main()
