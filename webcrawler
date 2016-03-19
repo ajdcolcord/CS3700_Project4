@@ -1,20 +1,57 @@
 #!/usr/bin/python -u
 import sys
 from HTMLParser import HTMLParser
-from get import get_login_page, post_login
+from get import get_login_page, post_login, get_first_page, get_by_url
+import socket
 
 ADDRESS = "http://fring.ccs.neu.edu/accounts/login/?next=/fakebook/"
 
 LOGIN_PAGE_PATH = "/accounts/login/?next=/fakebook.html"
 
-
+HOSTNAME = "fring.ccs.neu.edu"
+PORT = 80
 LOGIN_USERNAME = "id_username"
 LOGIN_PASSWORD = "id_password"
 MIDDLEWARE_TOKEN = None
 USERNAME = "001196344"
 PASSWORD = "7L3AD6ZH"
+SESSION_ID = None
+COOKIE = None
 
-class MyHTMLParser(HTMLParser):
+SECRET_FLAGS = []
+
+FRONTIER = {}
+
+
+
+
+
+class AnchorHTMLParser(HTMLParser):
+    def __init__(self):
+        HTMLParser.__init__(self)
+        self.recording = 0
+        self.data = []
+
+    def handle_starttag(self, tag, attrs):
+        global FRONTIER
+
+
+
+        if tag == "a":
+            for attr in attrs:
+                if attr[0] == "href":
+                    if attr[1][0].strip() == "/":
+                        if attr[1] not in FRONTIER:
+                            FRONTIER[attr[1]] = False
+
+        if tag == "h2":
+            for attr in attrs:
+                if attr[0] == "class":
+                    if attr[1] == "secret_flag":
+                        print "FOUND SECRET FLAG"
+
+
+class LoginHTMLParser(HTMLParser):
     def __init__(self):
         HTMLParser.__init__(self)
         self.recording = 0
@@ -22,10 +59,6 @@ class MyHTMLParser(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         global MIDDLEWARE_TOKEN
-
-        #print("Start tag:", tag)
-        #for attr in attrs:
-        #    print("     attr:", attr)
 
         if tag == "input":
             #print tag
@@ -38,7 +71,6 @@ class MyHTMLParser(HTMLParser):
                                 MIDDLEWARE_TOKEN = attr[1]
                                 print MIDDLEWARE_TOKEN
 
-                    #print attr
 
     """
     def handle_endtag(self, tag):
@@ -65,33 +97,90 @@ class MyHTMLParser(HTMLParser):
 
 
 def main():
+    global FRONTIER
+    global COOKIE
+
+
+    SOCK = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    SOCK.connect((HOSTNAME, PORT))
+
     username = sys.argv[1]
     password = sys.argv[2]
 
-    login(username, password)
+    login(username, password, SOCK)
+    anchor_parser = AnchorHTMLParser()
+
+    #while len(SECRET_FLAGS) < 5:
+
+    current_frontier = FRONTIER.copy()
+
+    for url in current_frontier:
+        if not current_frontier[url]:
+            print "Checking: " + str(url)
+            url_return = get_by_url(url, COOKIE, SOCK)
+
+            anchor_parser.feed(url_return)
+            find_secret_flag(url_return)
+            FRONTIER[url] = True
+    print "Checked frontier, looping again"
 
 
 
-def login(username, password):
+
+
+    anchor_parser.close()
+
+
+
+def find_secret_flag(html_string):
+    global SECRET_FLAGS
+    secret_flag = html_string.find("FLAG:")
+    if secret_flag > -1:
+        secret = html_string[secret_flag + 6: secret_flag + 70]
+        SECRET_FLAGS.append(secret)
+        print "FOUND SECRET FLAG: " + str(secret)
+
+def login(username, password, sock):
     global ADDRESS
     global MIDDLEWARE_TOKEN
+    global SESSION_ID
+    global COOKIE
 
     #login_html = urllib2.urlopen(ADDRESS).read()
-    login_html = get_login_page()
-    print login_html
+    login_html = get_login_page(sock)
 
-    parser = MyHTMLParser()
+    login_parser = LoginHTMLParser()
 
     # parse login_html for username
-    parser.feed(login_html)
+    login_parser.feed(login_html)
+    login_parser.close()
 
     print "USER: " + USERNAME
     print "PASSWORD " + PASSWORD
     print "TOKEN " + MIDDLEWARE_TOKEN
 
-    print post_login(LOGIN_PAGE_PATH, USERNAME, PASSWORD, MIDDLEWARE_TOKEN)
+    login_return = post_login("/accounts/login/", USERNAME, PASSWORD, MIDDLEWARE_TOKEN, sock)
+    print login_return
 
-    parser.close()
+    session_index = login_return.find("sessionid=")
+
+    SESSION_ID = login_return[session_index + 10: session_index + 42]
+
+
+    COOKIE = str("csrftoken=" + str(MIDDLEWARE_TOKEN) + "; sessionid=" + str(SESSION_ID))
+    print COOKIE
+    first_page = get_first_page(COOKIE, sock)
+    anchor_parser = AnchorHTMLParser()
+    anchor_parser.feed(first_page)
+    anchor_parser.close()
+
+    print "FRONTIER = " + str(FRONTIER)
+
+    find_secret_flag(first_page)
+
+    print SECRET_FLAGS
+
+
 
     #genPostReq(username, password, MIDDLEWARE_TOKEN)
 
