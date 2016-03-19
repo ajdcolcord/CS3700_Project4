@@ -15,43 +15,60 @@ LOGIN_PAGE_PATH = "/accounts/login/?next=/fakebook/"
 GET_LOGIN_STRING = "GET /accounts/login/?next=/fakebook/ HTTP/1.1 \nHost: fring.ccs.neu.edu\nUser-Agent: HTTPTool/1.1 \n \n"
 
 
-def send_and_receive(message, sock):
+def send_and_receive(message):
+    #print "SENDING AND RECEIVING"
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        sock.connect((HOSTNAME, PORT))
-        sock.send(message)
-        result = ""
+    #try:
+    #print "connecting..."
+    sock.connect((HOSTNAME, PORT))
+    sock.settimeout(0.1)
+    #print "- connected!"
 
-        while True:
+    #print "sending..."
+    sock.send(message)
+    #print "- sent!"
+    result = ""
+
+    #print "looping..."
+
+    while True:
+        try:
             recv = sock.recv(RECV_MESSAGE_SIZE)
             if recv:
+                #print "received more..."
                 result += recv
             else:
                 break
+        except:
+            break
 
-        return result
-    except socket.error:
-        print "Could not connect to host" + str(HOSTNAME)
-        sys.exit(1)
 
-def get_by_url(url, cookie, sock):
+    print "- SENT AND RECEIVED"
+
+    return result
+
+    #except socket.error:
+    #    print "Could not connect to host" + str(HOSTNAME)
+        #sys.exit(1)
+
+def get_by_url(url, cookie):
     get_str = "GET " + url + " HTTP/1.1\n" \
               "Host: fring.ccs.neu.edu\n" \
               "Connection:keep-alive\n" \
               "Cookie: " + str(cookie) + "\n" \
               "User-Agent: HTTPTool/1.1\n\n"
-    return send_and_receive(get_str, sock)
+    return send_and_receive(get_str)
 
 
-def get_login_page(sock):
+def get_login_page():
     get_str = "GET /accounts/login/?next=/fakebook/ HTTP/1.1\n" \
               "Host: fring.ccs.neu.edu\n" \
               "Connection:keep-alive\n" \
               "User-Agent: HTTPTool/1.1\n\n"
-    return send_and_receive(get_str, sock)
+    return send_and_receive(get_str)
 
 
-def get_first_page(cookie, sock):
+def get_first_page(cookie):
     get_str = "GET /fakebook/ HTTP/1.1\n" \
               "Host: fring.ccs.neu.edu\n" \
               "Connection:keep-alive\n" \
@@ -61,11 +78,11 @@ def get_first_page(cookie, sock):
 
     #"Accept-Encoding: gzip\n" \
 
-    return send_and_receive(get_str, sock)
+    return send_and_receive(get_str)
 
 
 
-def post_login(path_name, username, password, mwtoken, sock):
+def post_login(path_name, username, password, mwtoken):
 
     post_message = "POST /accounts/login/ HTTP/1.1\n" \
                     "Host: fring.ccs.neu.edu\n" \
@@ -82,7 +99,7 @@ def post_login(path_name, username, password, mwtoken, sock):
                     "Cookie: csrftoken=" + str(mwtoken) + "\n\n" \
                     "username=" + str(username) + "&password=" + str(password) + "&csrfmiddlewaretoken=" + str(mwtoken) + "&next=%2Ffakebook%2F\n"
 
-    return send_and_receive(post_message, sock)
+    return send_and_receive(post_message)
 
 
 
