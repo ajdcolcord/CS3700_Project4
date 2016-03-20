@@ -1,5 +1,6 @@
 #!/usr/bin/python -u
 import sys
+import socket
 from HTMLParser import HTMLParser
 from get import get_login_page, post_login, get_first_page, get_by_url
 
@@ -16,10 +17,19 @@ USERNAME = "001196344"
 PASSWORD = "7L3AD6ZH"
 SESSION_ID = None
 COOKIE = None
+RECV_MESSAGE_SIZE = 1024
 
 SECRET_FLAGS = []
 
 FRONTIER = {}
+
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+sock.connect((HOSTNAME, PORT))
+
+#sock.settimeout(0.1)
+
 
 
 
@@ -71,29 +81,6 @@ class LoginHTMLParser(HTMLParser):
                                 print MIDDLEWARE_TOKEN
 
 
-    """
-    def handle_endtag(self, tag):
-        print("End tag  :", tag)
-
-    def handle_data(self, data):
-        print("Data     :", data)
-
-    def handle_comment(self, data):
-        print("Comment  :", data)
-    def handle_entityref(self, name):
-        c = chr(name2codepoint[name])
-        print("Named ent:", c)
-    def handle_charref(self, name):
-        if name.startswith('x'):
-            c = chr(int(name[1:], 16))
-        else:
-            c = chr(int(name))
-        print("Num ent  :", c)
-    def handle_decl(self, data):
-        print("Decl     :", data)
-
-    """
-
 
 def main():
     global FRONTIER
@@ -105,7 +92,9 @@ def main():
     username = sys.argv[1]
     password = sys.argv[2]
 
-    login(username, password)
+    while not SESSION_ID:
+        login(username, password)
+
     anchor_parser = AnchorHTMLParser()
 
     while len(SECRET_FLAGS) < 5:
@@ -115,11 +104,29 @@ def main():
         for url in current_frontier:
             if not current_frontier[url]:
                 print "Checking: " + str(url)
-                url_return = get_by_url(url, COOKIE)
+                response = get_by_url(url, COOKIE)
 
-                anchor_parser.feed(url_return)
-                find_secret_flag(url_return)
-                FRONTIER[url] = True
+                code = find_status_code(response)
+                code_range = code / 100
+                if code_range == 2: # OK
+                    anchor_parser.feed(response)
+                    find_secret_flag(response)
+                    FRONTIER[url] = True
+
+                elif code_range == 3: # REDIRECT
+                    new_url = redirect(response)
+                    if new_url:
+                        if new_url not in FRONTIER:
+                            FRONTIER[new_url] = False
+                    FRONTIER[url] = True
+
+                elif code_range == 4: # NOT FOUND/ FORBIDDEN - ABANDON
+                    FRONTIER[url] = True
+
+                elif code_range == 5: # SERVER ERROR - RETRY
+                    FRONTIER[url] = False # technically not necessary
+
+
                 if len(SECRET_FLAGS) >= 5:
                     break
 
@@ -131,7 +138,41 @@ def main():
 
 
     anchor_parser.close()
+    print str(SECRET_FLAGS)
 
+
+def redirect(response):
+    lines = response.split('\n', 1)
+    for line in lines:
+        if line[0:10] == "Location: ":
+            url = line[10:]
+            if url[0] == "/":
+                return url
+            host_index = url.find(HOSTNAME)
+            if -1 < host_index < 10:
+                url = url[host_index + len(HOSTNAME):]
+            return url
+    return False
+
+
+def is_chunked(response):
+    lines = response.split('\n', 1)
+    for line in lines:
+        if line.find("Transfer-Encoding: chunked"):
+            return True
+    return False
+
+
+
+
+
+def find_status_code(response):
+    first_line = response.split('\n', 1)[0]
+    if len(first_line):
+        code = first_line[9:12]
+    else:
+        code = 500
+    return int(code)
 
 
 def find_secret_flag(html_string):
@@ -181,35 +222,6 @@ def login(username, password):
     find_secret_flag(first_page)
 
     print SECRET_FLAGS
-
-
-
-    #genPostReq(username, password, MIDDLEWARE_TOKEN)
-
-'''
-def genPostReq(username, password, mwtoken):
-    # Using the username, password, and token generate and send
-    # a POST request to the fakebook server.
-    url = 'http://fring.ccs.neu.edu/accounts/login/?next=/fakebook/'
-    values = {'username' : username,
-              'password' : password,
-              'next' : '/fakebook/',
-              'csrfmiddlewaretoken' : mwtoken }
-
-    try:
-        data = urllib.urlencode(values)
-        req = urllib2.Request(url, data)
-        response = urllib2.urlopen(req)
-        the_page = response.read()
-        handle_http_errs(the_page)
-        print the_page
-    except:
-        print "HTTP Error Code Returned"
-
-'''
-# Handles the http Response Code and decides the course of action
-def handle_http_errs(http_err):
-    print http_err
 
 
 if __name__ == "__main__":

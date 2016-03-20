@@ -16,40 +16,30 @@ GET_LOGIN_STRING = "GET /accounts/login/?next=/fakebook/ HTTP/1.1 \nHost: fring.
 
 
 def send_and_receive(message):
-    #print "SENDING AND RECEIVING"
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    #try:
-    #print "connecting..."
+
     sock.connect((HOSTNAME, PORT))
+
     sock.settimeout(0.1)
-    #print "- connected!"
 
-    #print "sending..."
     sock.send(message)
-    #print "- sent!"
     result = ""
-
-    #print "looping..."
 
     while True:
         try:
             recv = sock.recv(RECV_MESSAGE_SIZE)
             if recv:
-                #print "received more..."
                 result += recv
+                if recv.find("</html>") >= 0:
+                    break
             else:
                 break
         except:
             break
 
-
-    print "- SENT AND RECEIVED"
-
     return result
 
-    #except socket.error:
-    #    print "Could not connect to host" + str(HOSTNAME)
-        #sys.exit(1)
 
 def get_by_url(url, cookie):
     get_str = "GET " + url + " HTTP/1.1\n" \
@@ -100,10 +90,3 @@ def post_login(path_name, username, password, mwtoken):
                     "username=" + str(username) + "&password=" + str(password) + "&csrfmiddlewaretoken=" + str(mwtoken) + "&next=%2Ffakebook%2F\n"
 
     return send_and_receive(post_message)
-
-
-
-
-#print get_login_page()
-#print get_login_page()
-#print post_login(LOGIN_PAGE_PATH, USERNAME, PASSWORD, 0)
