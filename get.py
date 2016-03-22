@@ -1,19 +1,8 @@
-import socket, sys
-import select
+import socket
 
 HOSTNAME = "fring.ccs.neu.edu"
 PORT = 80
 RECV_MESSAGE_SIZE = 1024
-USERNAME = "001196344"
-PASSWORD = "7L3AD6ZH"
-
-
-
-
-LOGIN_PAGE_PATH = "/accounts/login/?next=/fakebook/"
-
-GET_LOGIN_STRING = "GET /accounts/login/?next=/fakebook/ HTTP/1.1 \nHost: fring.ccs.neu.edu\nUser-Agent: HTTPTool/1.1 \n \n"
-
 
 def send_and_receive(message):
 
@@ -21,7 +10,7 @@ def send_and_receive(message):
 
     sock.connect((HOSTNAME, PORT))
 
-    sock.settimeout(0.1)
+    sock.settimeout(0.2)
 
     sock.send(message)
     result = ""
@@ -66,8 +55,6 @@ def get_first_page(cookie):
               "Cookie: " + str(cookie) + "\n" \
               "User-Agent: HTTPTool/1.1\n\n"
 
-    #"Accept-Encoding: gzip\n" \
-
     return send_and_receive(get_str)
 
 
@@ -84,7 +71,6 @@ def post_login(path_name, username, password, mwtoken):
                     "Upgrade-Insecure-Requests: 1\n" \
                     "User-Agent: HTTPTool/1.1\n" \
                     "Referer: http://fring.ccs.neu.edu/accounts/login/?next=/fakebook/\n" \
-                    "Accept-Encoding: gzip, deflate\n" \
                     "Accept-Language: en-US,en;q=0.8\n" \
                     "Cookie: csrftoken=" + str(mwtoken) + "\n\n" \
                     "username=" + str(username) + "&password=" + str(password) + "&csrfmiddlewaretoken=" + str(mwtoken) + "&next=%2Ffakebook%2F\n"
