@@ -78,7 +78,9 @@ def main():
     username = sys.argv[1]
     password = sys.argv[2]
 
-    while not SESSION_ID:
+    # ensure attempt to login until the session_id, cookie, AND
+    # frontier all have values set before attempting to crawl the website
+    while not SESSION_ID or not COOKIE or not len(FRONTIER):
         login(username, password)
 
     main_loop()
@@ -90,7 +92,6 @@ def main_loop():
     FRONTIER for any non-checked URLs. It creates a get request to each
     non-searched URL, parses for all anchor tags, and searches for any
     secret flags on the page (adding them to the SECRET_FLAGS list if found)
-    :return:
     """
     global FRONTIER
     global COOKIE
@@ -100,7 +101,7 @@ def main_loop():
     while len(SECRET_FLAGS) < 5:
 
         if not len(FRONTIER):
-            print "FRONTIER empty, did not successfully GET first page to crawl"
+            print "ERROR: FRONTIER empty, did not successfully get first page. Try again."
             break
         current_frontier = FRONTIER.copy()
 
@@ -132,23 +133,23 @@ def response_code_actions(code_range, anchor_parser, response_str, url):
     :param response_str: String - the response from the request on the socket
     :param url: String - the url of this current page being parsed
     """
-    if code_range == 2: # OK
+    if code_range == 2:  # OK
         anchor_parser.feed(response_str)
         find_secret_flag(response_str)
         FRONTIER[url] = True
 
-    elif code_range == 3: # REDIRECT
+    elif code_range == 3:  # REDIRECT
         new_url = redirect(response_str)
         if new_url:
             if new_url not in FRONTIER:
                 FRONTIER[new_url] = False
         FRONTIER[url] = True
 
-    elif code_range == 4: # NOT FOUND/ FORBIDDEN - ABANDON
+    elif code_range == 4:  # NOT FOUND/ FORBIDDEN - ABANDON
         FRONTIER[url] = True
 
-    elif code_range == 5: # SERVER ERROR - RETRY
-        FRONTIER[url] = False # technically not necessary
+    elif code_range == 5:  # SERVER ERROR - RETRY
+        FRONTIER[url] = False  # technically not necessary
 
 
 def redirect(response):
@@ -168,35 +169,6 @@ def redirect(response):
             if -1 < host_index < 10:
                 url = url[host_index + len(HOSTNAME):]
             return url
-    return False
-
-
-def is_chunked(response):
-    """
-    Parses the header in the HTTP response string to determine
-    if this response is chunked or not.
-    :param response: String - the HTTP response to parse
-    :return: Boolean - True if chunked, False if not
-    """
-    lines = response.split('\n', 1)
-    for line in lines:
-        if line.find("Transfer-Encoding: chunked"):
-            return True
-    return False
-
-
-def is_gzipped(response):
-    """
-    Parses the header in the HTTP response string to determine
-    if this response is encoded using gzip or not.
-    :param response: String - the HTTP response to parse
-    :return: Boolean - True if gzipped, False if not
-    """
-    lines = response.split('\n', 1)
-    for line in lines:
-        if line.find("Content-Encoding:"):
-            if line.find("gzip") > 0:
-                return True
     return False
 
 
@@ -258,21 +230,23 @@ def login(username, password):
 
     login_return = post_login(username, password, MIDDLEWARE_TOKEN)
 
+    # sets the Session ID and the Cookie
     session_index = login_return.find("sessionid=")
-
     SESSION_ID = login_return[session_index + 10: session_index + 42]
-
     COOKIE = str("csrftoken=" + str(MIDDLEWARE_TOKEN) + "; sessionid=" + str(SESSION_ID))
+
     first_page = get_first_page(COOKIE)
 
     if find_status_code(first_page) / 100 != 2:
         print "Not Authorized: Incorrect Username or Password. Try again.\n"
         sys.exit(0)
 
+    # parses the first page for anchor tags
     anchor_parser = AnchorHTMLParser()
     anchor_parser.feed(first_page)
     anchor_parser.close()
 
+    # check the first page for secret flags
     find_secret_flag(first_page)
 
 
@@ -282,10 +256,10 @@ def send_and_receive(message):
     sends the given message across the socket, and attempts
     to receive from the socket (until the end html tag is found),
     closing the socket and breaking at the end.
+
     :param message: the message to send to the server
     :return: String - the response from the server
     """
-
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     sock.connect((HOSTNAME, PORT))
