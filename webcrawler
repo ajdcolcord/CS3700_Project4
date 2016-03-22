@@ -1,13 +1,17 @@
 #!/usr/bin/python -u
+
+# Austin Colcord and Nick Scheuring
+# This is a simple webcrawler that traverses through the
+# fakebook website (fring.ccs.neu.edu), searching for 'secret flags'
+# located on the website, unique to the given username and password
+
 import sys
 from HTMLParser import HTMLParser
-from get import get_login_page, post_login, get_first_page, get_by_url
+import socket
 
 HOSTNAME = "fring.ccs.neu.edu"
 PORT = 80
 RECV_MESSAGE_SIZE = 1024
-#USERNAME = "001196344"
-#PASSWORD = "7L3AD6ZH"
 MIDDLEWARE_TOKEN = None
 SESSION_ID = None
 COOKIE = None
@@ -81,6 +85,13 @@ def main():
 
 
 def main_loop():
+    """
+    Runs the main functions to crawl the website by checking through the
+    FRONTIER for any non-checked URLs. It creates a get request to each
+    non-searched URL, parses for all anchor tags, and searches for any
+    secret flags on the page (adding them to the SECRET_FLAGS list if found)
+    :return:
+    """
     global FRONTIER
     global COOKIE
 
@@ -88,11 +99,13 @@ def main_loop():
 
     while len(SECRET_FLAGS) < 5:
 
+        if not len(FRONTIER):
+            print "FRONTIER empty, did not successfully GET first page to crawl"
+            break
         current_frontier = FRONTIER.copy()
 
         for url in current_frontier:
             if not current_frontier[url]:
-                #print "Checking: " + str(url)
                 response = get_by_url(url, COOKIE)
 
                 code = find_status_code(response)
@@ -103,12 +116,7 @@ def main_loop():
                 if len(SECRET_FLAGS) >= 5:
                     break
 
-
-        print "Checked frontier, looping again"
-
     anchor_parser.close()
-    for flag in SECRET_FLAGS:
-        print str(flag)
 
 
 def response_code_actions(code_range, anchor_parser, response_str, url):
@@ -130,7 +138,6 @@ def response_code_actions(code_range, anchor_parser, response_str, url):
         FRONTIER[url] = True
 
     elif code_range == 3: # REDIRECT
-        print "3xx Response"
         new_url = redirect(response_str)
         if new_url:
             if new_url not in FRONTIER:
@@ -138,11 +145,9 @@ def response_code_actions(code_range, anchor_parser, response_str, url):
         FRONTIER[url] = True
 
     elif code_range == 4: # NOT FOUND/ FORBIDDEN - ABANDON
-        print "4xx Response"
         FRONTIER[url] = True
 
     elif code_range == 5: # SERVER ERROR - RETRY
-        print "5xx Response"
         FRONTIER[url] = False # technically not necessary
 
 
@@ -180,6 +185,21 @@ def is_chunked(response):
     return False
 
 
+def is_gzipped(response):
+    """
+    Parses the header in the HTTP response string to determine
+    if this response is encoded using gzip or not.
+    :param response: String - the HTTP response to parse
+    :return: Boolean - True if gzipped, False if not
+    """
+    lines = response.split('\n', 1)
+    for line in lines:
+        if line.find("Content-Encoding:"):
+            if line.find("gzip") > 0:
+                return True
+    return False
+
+
 def find_status_code(response):
     """
     Parses the HTTP response (given) and grabs the
@@ -209,7 +229,7 @@ def find_secret_flag(html_string):
         secret = html_string[secret_flag + 6: secret_flag + 70]
         if secret not in SECRET_FLAGS:
             SECRET_FLAGS.append(secret)
-        print "FOUND SECRET FLAG: " + str(secret)
+            print str(secret)
 
 
 def login(username, password):
@@ -236,7 +256,7 @@ def login(username, password):
     login_parser.feed(login_html)
     login_parser.close()
 
-    login_return = post_login("/accounts/login/", username, password, MIDDLEWARE_TOKEN)
+    login_return = post_login(username, password, MIDDLEWARE_TOKEN)
 
     session_index = login_return.find("sessionid=")
 
@@ -254,6 +274,119 @@ def login(username, password):
     anchor_parser.close()
 
     find_secret_flag(first_page)
+
+
+def send_and_receive(message):
+    """
+    Opens a new socket to the global HOSTNAME and PORT,
+    sends the given message across the socket, and attempts
+    to receive from the socket (until the end html tag is found),
+    closing the socket and breaking at the end.
+    :param message: the message to send to the server
+    :return: String - the response from the server
+    """
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    sock.connect((HOSTNAME, PORT))
+
+    sock.settimeout(0.2)
+
+    sock.send(message)
+    result = ""
+
+    while True:
+        try:
+            recv = sock.recv(RECV_MESSAGE_SIZE)
+            if recv:
+                result += recv
+                if recv.find("</html>") >= 0:
+                    sock.close()
+                    break
+            else:
+                break
+        except:
+            break
+
+    return result
+
+
+def get_by_url(url, cookie):
+    """
+    Creates a get request for the given URL and the
+    cookie information, and sends the request, returing
+    the response from the server
+
+    :param url: String - the URL to request
+    :param cookie: String - the cookie information for the request
+    :return: String - the response from the request
+    """
+    get_str = "GET " + str(url) + " HTTP/1.1\n" \
+              "Host: " + str(HOSTNAME) + "\n" \
+              "Cookie: " + str(cookie) + "\n" \
+              "User-Agent: HTTPTool/1.1\n\n"
+    return send_and_receive(get_str)
+
+
+def get_login_page():
+    """
+    Creates a get request for the login page for facebook
+    and sends the request to the server, returning the response.
+
+    :return: String - the response from the request
+    """
+    get_str = "GET /accounts/login/?next=/fakebook/ HTTP/1.1\n" \
+              "Host: " + str(HOSTNAME) + "\n" \
+              "User-Agent: HTTPTool/1.1\n\n"
+    return send_and_receive(get_str)
+
+
+def get_first_page(cookie):
+    """
+    Creates a get request for the initial page URL using the
+    cookie information, sends the request, and return
+    the response from the server.
+
+    :param url: String - the URL to request
+    :param cookie: String - the cookie information for the request
+    :return: String - the response from the request
+    """
+    get_str = "GET /fakebook/ HTTP/1.1\n" \
+              "Host: " + str(HOSTNAME) + "\n" \
+              "Cache-Control: max-age=0\n" \
+              "Cookie: " + str(cookie) + "\n" \
+              "User-Agent: HTTPTool/1.1\n\n"
+
+    return send_and_receive(get_str)
+
+
+def post_login(username, password, mwtoken):
+    """
+    Create a POST message for the login information necessary to
+    gain access to the fakebook website, using the given username,
+    password, and middleware token to verify the login information.
+    Sends the message to the server and returns the response.
+
+    :param username: String - the username to login
+    :param password: String - the password used to login
+    :param mwtoken: String - the middleware verification token
+    :return: String - the response from the server
+    """
+    post_message = "POST /accounts/login/ HTTP/1.1\n" \
+                    "Host: " + str(HOSTNAME) + "\n" \
+                    "Connection: keep-alive\n" \
+                    "Content-Length: 92\n" \
+                    "Cache-Control: max-age=0\n" \
+                    "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\n" \
+                    "Origin: http://" + str(HOSTNAME) + "\n" \
+                    "Upgrade-Insecure-Requests: 1\n" \
+                    "User-Agent: HTTPTool/1.1\n" \
+                    "Referer: http://" + str(HOSTNAME) + "/accounts/login/?next=/fakebook/\n" \
+                    "Accept-Language: en-US,en;q=0.8\n" \
+                    "Cookie: csrftoken=" + str(mwtoken) + "\n\n" \
+                    "username=" + str(username) + "&password=" + str(password) + "&csrfmiddlewaretoken=" + str(mwtoken) + "&next=%2Ffakebook%2F\n"
+
+    return send_and_receive(post_message)
 
 if __name__ == "__main__":
     main()
